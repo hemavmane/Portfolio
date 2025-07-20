@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deploy MERN App  on Hostinger VPS</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    h1, h2 {
+      color: #2c3e50;
+    }
+    pre {
+      background: #eee;
+      padding: 10px;
+      overflow-x: auto;
+    }
+    img {
+      max-width: 100%;
+      margin: 20px 0;
+    }
+    .author {
+      margin-top: 40px;
+      font-style: italic;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <h1>Deploying MERN App on Hostinger VPS (Ubuntu)</h1>
+
+  <h2>🔐 Connecting to the VPS</h2>
+  <p>To connect to your VPS server, use your server IP with either password or (recommended) SSH key authentication.</p>
+
+  <h3>Creating SSH Key (macOS/Linux/Windows with OpenSSH)</h3>
+  <pre><code>ssh-keygen -t rsa</code></pre>
+  <p>Press ENTER to save to the default path, then type and confirm a passphrase.</p>
+  <p>To copy the key to clipboard:</p>
+  <pre><code>pbcopy < ~/.ssh/id_rsa.pub</code></pre>
+
+  <h3>Windows (Using PuTTY)</h3>
+  <ol>
+    <li>Download and open PuTTYgen</li>
+    <li>Click <strong>Generate</strong>, move your mouse randomly until complete</li>
+    <li>Set a passphrase, save public and private keys</li>
+  </ol>
+
+  <h3>Connecting</h3>
+  <pre><code>ssh root@&lt;your-server-ip&gt;</code></pre>
+  <p>Paste your public key in the VPS provider dashboard beforehand.</p>
+
+  <h2>🧹 First Configuration & Cleanup</h2>
+  <pre><code>systemctl stop apache2
+systemctl disable apache2
+apt remove apache2
+apt autoremove</code></pre>
+
+  <h2>🧼 Update & Clean Server</h2>
+  <pre><code>apt clean all && sudo apt update && sudo apt dist-upgrade
+rm -rf /var/www/html</code></pre>
+
+  <h2>⚙️ Install & Configure Nginx</h2>
+  <pre><code>apt install nginx
+systemctl start nginx
+apt install ufw
+ufw enable
+ufw allow "Nginx Full"</code></pre>
+
+  <h3>Delete default configuration</h3>
+  <pre><code>rm /etc/nginx/sites-available/default
+rm /etc/nginx/sites-enabled/default</code></pre>
+
+  <h2>🧾 Initial Nginx Config</h2>
+  <pre><code>nano /etc/nginx/sites-available/gds</code></pre>
+  <pre><code>server {
+  listen 80;
+  location / {
+    root /var/www/gds;
+    index  index.html index.htm;
+    try_files $uri $uri/ /index.html;
+  }
+}</code></pre>
+  <pre><code>ln -s /etc/nginx/sites-available/gds /etc/nginx/sites-enabled/gds</code></pre>
+
+  <h2>✏️ Write First Page</h2>
+  <pre><code>mkdir -p /var/www/gds
+nano /var/www/gds/index.html</code></pre>
+
+  <h2>🚀 Git Deployment</h2>
+  <pre><code>apt install git
+mkdir gds
+cd gds
+git clone &lt;your repository&gt;</code></pre>
+
+  <h2>🔧 Nginx API Proxy Example</h2>
+  <pre><code>location /api {
+  proxy_pass http://45.90.108.107:8800;
+  proxy_http_version 1.1;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection 'upgrade';
+  proxy_set_header Host $host;
+  proxy_cache_bypass $http_upgrade;
+}</code></pre>
+
+  <h2>🟢 Node.js Setup</h2>
+  <pre><code>apt install nodejs
+apt install npm
+cd api
+npm install
+nano .env
+node index.js</code></pre>
+
+  <h2>🧩 PM2 Process Manager</h2>
+  <pre><code>npm install -g pm2
+pm2 start index.js --name api
+pm2 startup ubuntu
+pm2 save</code></pre>
+
+  <p>Check PM2 status:</p>
+  <pre><code>pm2 list</code></pre>
+  <pre><code>
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ gdsserver          │ fork     │ 3    │ online    │ 0%       │ 159.4mb  │
+│ 1  │ hcserver           │ fork     │ 0    │ online    │ 0%       │ 102.0mb  ││
+│ 2  │ lbserver           │ fork     │ 0    │ online    │ 0%       │ 96.2mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+  </code></pre>
+
+  <h2>⚛️ React App Deployment</h2>
+  <pre><code>cd ../client
+nano .env
+npm install
+npm run build</code></pre>
+  <pre><code>rm -rf /var/www/gds/*
+mkdir /var/www/gds/client
+cp -r build/* /var/www/gds/client</code></pre>
+
+  <h2>🧾 Final Nginx Configuration</h2>
+  <pre><code>location / {
+  root /var/www/gds/client/;
+  index  index.html index.htm;
+  try_files $uri $uri/ /index.html;
+}</code></pre>
+
+  <h2>🌐 Adding Domain</h2>
+  <ol>
+    <li>Configure A records with your domain registrar</li>
+    <li>Adjust your router paths and environment files</li>
+    <li>Final server configs:</li>
+  </ol>
+
+  <pre><code>server {
+ listen 80;
+ server_name example.com www.example.com;
+ location / {
+  root /var/www/gds/client;
+  index index.html index.htm;
+  try_files $uri $uri/ /index.html;
+ }
+}
+
+server {
+ listen 80;
+ server_name api.example.com;
+ location / {
+  proxy_pass http://45.90.108.107:8800;
+  proxy_set_header Host $host;
+  proxy_http_version 1.1;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection 'upgrade';
+  proxy_cache_bypass $http_upgrade;
+ }
+}
+
+server {
+ listen 80;
+ server_name admin.example.com;
+ location / {
+  root /var/www/gds/admin;
+  index index.html index.htm;
+  try_files $uri $uri/ /index.html;
+ }
+}</code></pre>
+
+  <h2>🔐 SSL Certification</h2>
+  <pre><code>apt install certbot python3-certbot-nginx
+ufw status
+certbot --nginx -d example.com -d www.example.com</code></pre>
+
+  <p>Certificates are valid for 90 days. Set up automatic renewal:</p>
+  <pre><code>systemctl status certbot.timer</code></pre>
+
+  <br><br>
+  <p><em>Blog by Hema V Mane</em></p>
+</body>
+</html>
